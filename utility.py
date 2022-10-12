@@ -37,6 +37,12 @@ def add_numeric_field(input_fc, field_name, field_type):
         arcpy.AddField_management(input_fc, field_name, field_type)
 
 
+def add_field_if_needed(input_fc, field_to_add, field_type, scale = None, length = None):
+    field_names = list_field_names(input_fc)
+    if field_to_add not in field_names:
+        arcpy.AddField_management(input_fc, field_to_add, field_type, scale, length)
+
+
 def delete_fields(existing_table, keep_fields_list):
     field_name_required_dict = get_field_names_and_required(existing_table)
     remove_list = create_remove_list(field_name_required_dict, keep_fields_list)
@@ -59,3 +65,42 @@ def create_remove_list(existing_names_and_required, field_list):
             remove_field_list.append(key)
     return remove_field_list
 
+
+def get_field_value_as_dict(input, key_field, value_field):
+    value_dict = {}
+    with arcpy.da.SearchCursor(input, (key_field, value_field)) as cursor:
+        for row in cursor:
+            value_dict[row[0]] = row[1]
+    return value_dict
+
+
+def assign_field_value_from_dict(input_dict, target, target_key_field, target_field):
+    with arcpy.da.UpdateCursor(target, (target_key_field, target_field)) as cursor:
+        for row in cursor:
+            for key, value in input_dict.items():
+                if row[0] == key:
+                    row[1] = value
+            cursor.updateRow(row)
+
+
+#def assign_field_value_from_dict_and_set_process_source(input_dict, target, target_key_field, target_field, process_source_value):
+#    with arcpy.da.UpdateCursor(target, (target_key_field, target_field, "process_source")) as cursor:
+#        for row in cursor:
+#            for key, value in input_dict.items():
+#                if row[0] == key:
+#                    row[1] = value
+#                    row[2] = process_source_value
+#            cursor.updateRow(row)
+
+def assign_field_value_from_dict_and_set_process_source(input_dict, target, target_key_field, target_field, process_source_value):
+    with arcpy.da.UpdateCursor(target, (target_key_field, target_field, "process_source")) as cursor:
+        for row in cursor:
+            if row[0] in input_dict.keys():
+                row[1] = input_dict[row[0]]
+                row[2] = process_source_value
+            cursor.updateRow(row)
+
+
+def get_and_assign_field_value_and_set_process_source(source, source_key_field, source_field, target, target_key_field, target_field, process_source_value):
+    value_dict = get_field_value_as_dict(source, source_key_field, source_field)
+    assign_field_value_from_dict_and_set_process_source(value_dict, target, target_key_field, target_field, process_source_value)

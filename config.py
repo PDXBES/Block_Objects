@@ -3,7 +3,7 @@ import utility
 import os
 from datetime import datetime
 
-print("Starting Config" + datetime.now().strftime("%m/%d/%Y, %H:%M:%S"))
+print("Starting Config: " + datetime.now().strftime("%m/%d/%Y, %H:%M:%S"))
 
 log_file = r"\\besfile1\ism_projects\Work_Orders\Joes_Sandbox\dev\block_objects_log"
 output_gdb = r"\\besfile1\ASM_AssetMgmt\Projects\Interagency Risk Grid\BlockEval\Data\Arc\GDB\block_working_v2.gdb"
@@ -25,9 +25,9 @@ street_centerline_raw = EGH_PUBLIC + r"\EGH_Public.ARCMAP_ADMIN.streets_pdx"
 ARC_ROW_raw = BESDBPROD1 + r"\SWSP.GIS.ARC_ROW"
 
 # create feature layers and subset by attributes if needed
-taxlots_sub = arcpy.MakeFeatureLayer_management(taxlots_raw, "in_memory\taxlots_sub")
-street_centerline_sub = arcpy.MakeFeatureLayer_management(street_centerline_raw, "in_memory\street_centerline_sub")
-ARC_ROW_sub = arcpy.MakeFeatureLayer_management(ARC_ROW_raw, "in_memory\ARC_ROW_sub", "Id is not Null")
+taxlots_sub = arcpy.MakeFeatureLayer_management(taxlots_raw, r"in_memory\taxlots_sub")
+street_centerline_sub = arcpy.MakeFeatureLayer_management(street_centerline_raw, r"in_memory\street_centerline_sub")
+ARC_ROW_sub = arcpy.MakeFeatureLayer_management(ARC_ROW_raw, r"in_memory\ARC_ROW_sub", "Id is not Null")
 
 # subset by geographic area
 arcpy.SelectLayerByLocation_management(taxlots_sub, "HAVE_THEIR_CENTER_IN", city_boundary_raw)
@@ -50,18 +50,21 @@ taxlots = arcpy.CopyFeatures_management(taxlots_sub, r"in_memory\taxlots")
 street_centerlines = arcpy.CopyFeatures_management(street_centerline_sub, r"in_memory\street_centerlines")
 ARC_ROW = arcpy.CopyFeatures_management(ARC_ROW_sub, r"in_memory\ARC_ROW")
 
-utility.add_numeric_field(RES_cayenta_taxlots, "gal_per_day", "DOUBLE")
+utility.add_field_if_needed(RES_cayenta_taxlots, "gal_per_day", "DOUBLE")
 with arcpy.da.UpdateCursor(RES_cayenta_taxlots, ["gal_per_day", "WINTER_AVERAGE_AMOUNT"]) as cursor:
     for row in cursor:
         if row[1] is not None:
             row[0] = row[1]*(CCF_to_gal_per_day/days_per_year)
             cursor.updateRow(row)
 
-utility.add_numeric_field(census_blocks_2020, "Pop", "LONG")
+utility.add_field_if_needed(census_blocks_2020, "Pop", "LONG")
 with arcpy.da.UpdateCursor(census_blocks_2020, ["Pop_sqmi", "SQMI", "Pop"]) as cursor:
     for row in cursor:
         if row[0] is not None and row[1] is not None:
             row[2] = row[0] * row[1]
             cursor.updateRow(row)
 
-print("Config Complete" + datetime.now().strftime("%m/%d/%Y, %H:%M:%S"))
+utility.add_field_if_needed(taxlots, "process_source", "TEXT", '', 25)
+utility.add_field_if_needed(taxlots, "LOCALID", "LONG")
+
+print("Config Complete: " + datetime.now().strftime("%m/%d/%Y, %H:%M:%S"))
