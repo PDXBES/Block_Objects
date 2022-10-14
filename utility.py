@@ -77,11 +77,13 @@ def get_field_value_as_dict(input, key_field, value_field):
 def assign_field_value_from_dict(input_dict, target, target_key_field, target_field):
     with arcpy.da.UpdateCursor(target, (target_key_field, target_field)) as cursor:
         for row in cursor:
-            for key, value in input_dict.items():
-                if row[0] == key:
-                    row[1] = value
+            if row[0] in input_dict.keys():
+                row[1] = input_dict[row[0]]
             cursor.updateRow(row)
 
+def get_and_assign_field_value_from_dict(source, source_key_field, source_field, target, target_key_field, target_field):
+    value_dict = get_field_value_as_dict(source, source_key_field, source_field)
+    assign_field_value_from_dict(value_dict, target, target_key_field, target_field)
 
 #def assign_field_value_from_dict_and_set_process_source(input_dict, target, target_key_field, target_field, process_source_value):
 #    with arcpy.da.UpdateCursor(target, (target_key_field, target_field, "process_source")) as cursor:

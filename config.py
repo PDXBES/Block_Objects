@@ -23,16 +23,19 @@ city_boundary_raw = EGH_PUBLIC + r"\EGH_Public.ARCMAP_ADMIN.portland_pdx"
 taxlots_raw = EGH_PUBLIC + r"\EGH_Public.ARCMAP_ADMIN.taxlots_pdx"
 street_centerline_raw = EGH_PUBLIC + r"\EGH_Public.ARCMAP_ADMIN.streets_pdx"
 ARC_ROW_raw = BESDBPROD1 + r"\SWSP.GIS.ARC_ROW"
+#print(arcpy.GetCount_management(ARC_ROW_raw))
 
 # create feature layers and subset by attributes if needed
 taxlots_sub = arcpy.MakeFeatureLayer_management(taxlots_raw, r"in_memory\taxlots_sub")
 street_centerline_sub = arcpy.MakeFeatureLayer_management(street_centerline_raw, r"in_memory\street_centerline_sub")
 ARC_ROW_sub = arcpy.MakeFeatureLayer_management(ARC_ROW_raw, r"in_memory\ARC_ROW_sub", "Id is not Null")
+#print(arcpy.GetCount_management(ARC_ROW_sub))
 
 # subset by geographic area
 arcpy.SelectLayerByLocation_management(taxlots_sub, "HAVE_THEIR_CENTER_IN", city_boundary_raw)
 arcpy.SelectLayerByLocation_management(street_centerline_sub, "HAVE_THEIR_CENTER_IN", city_boundary_raw)
 arcpy.SelectLayerByLocation_management(ARC_ROW_sub, "HAVE_THEIR_CENTER_IN", city_boundary_raw)
+#print(arcpy.GetCount_management(ARC_ROW_sub))
 
 # this is based on a view which is based on copies of CU and the taxlots - should move/ point at live
 RES_cayenta_taxlots_QL = arcpy.MakeQueryLayer_management(BESGEORPT_TEST,
@@ -49,6 +52,7 @@ RES_cayenta_taxlots = arcpy.CopyFeatures_management(RES_cayenta_taxlots_QL, r"in
 taxlots = arcpy.CopyFeatures_management(taxlots_sub, r"in_memory\taxlots")
 street_centerlines = arcpy.CopyFeatures_management(street_centerline_sub, r"in_memory\street_centerlines")
 ARC_ROW = arcpy.CopyFeatures_management(ARC_ROW_sub, r"in_memory\ARC_ROW")
+#print(arcpy.GetCount_management(ARC_ROW))
 
 utility.add_field_if_needed(RES_cayenta_taxlots, "gal_per_day", "DOUBLE")
 with arcpy.da.UpdateCursor(RES_cayenta_taxlots, ["gal_per_day", "WINTER_AVERAGE_AMOUNT"]) as cursor:
@@ -64,7 +68,7 @@ with arcpy.da.UpdateCursor(census_blocks_2020, ["Pop_sqmi", "SQMI", "Pop"]) as c
             row[2] = row[0] * row[1]
             cursor.updateRow(row)
 
-utility.add_field_if_needed(taxlots, "process_source", "TEXT", '', 25)
+utility.add_field_if_needed(taxlots, "process_source", "TEXT", length=25)
 utility.add_field_if_needed(taxlots, "LOCALID", "LONG")
 
 print("Config Complete: " + datetime.now().strftime("%m/%d/%Y, %H:%M:%S"))

@@ -6,13 +6,23 @@ import os
 log_obj = utility.Logger(config.log_file)
 log_obj.info("Create Block Objects - starting".format())
 
+arcpy.env.overwriteOutput = True
 
 # data prep
 
 log_obj.info("Create Block Objects - formatting ARC_ROW".format())
 key_field = "LOCALID"
 ARC_ROW_dissolve = arcpy.management.Dissolve(config.ARC_ROW, r"in_memory\ARC_ROW_diss", key_field)
-arcpy.JoinField_management(ARC_ROW_dissolve, key_field, config.ARC_ROW, key_field, ["STREETNAME"])
+
+
+utility.add_field_if_needed(ARC_ROW_dissolve, "STREETNAME", "TEXT", length=50)
+utility.get_and_assign_field_value_from_dict(config.ARC_ROW,
+                                             key_field,
+                                             "STREETNAME",
+                                             ARC_ROW_dissolve,
+                                             key_field,
+                                             "STREETNAME")
+
 
 log_obj.info("Create Block Objects - creating centerline based allocation areas".format())
 arcpy.CheckOutExtension("Spatial")
@@ -25,7 +35,7 @@ allocation_vector = arcpy.RasterToPolygon_conversion(allocation_raster, r"in_mem
 log_obj.info("Create Block Objects -    spatial join 1".format())
 buffer_distance_ft = 3
 ROW_to_TL_sj_1to1 = arcpy.SpatialJoin_analysis(config.taxlots,
-                                          config.ARC_ROW,
+                                          ARC_ROW_dissolve,
                                           r"in_memory\ROW_to_TL_sj_1to1",
                                           "JOIN_ONE_TO_ONE",
                                           "KEEP_COMMON",
@@ -45,7 +55,7 @@ utility.delete_fields(ROW_to_TL_sj_1to1, keep_fields)
 
 log_obj.info("Create Block Objects -    spatial join 2".format())
 ROW_to_TL_sj_1toM = arcpy.SpatialJoin_analysis(ROW_to_TL_sj_1to1,
-                                          config.ARC_ROW,
+                                          ARC_ROW_dissolve,
                                           r"in_memory\ROW_to_TL_sj_1toM",
                                           "JOIN_ONE_TO_MANY",
                                           "KEEP_COMMON",
@@ -69,12 +79,13 @@ with arcpy.da.UpdateCursor(ROW_to_TL_sj_1toM, ['SITEADDR', 'STREETNAME', 'ADDR_m
            row[2] = 0
        cursor.updateRow(row)
 
-log_obj.info("Create Block Objects - assign ROW ID values to taxlots per spatial match".format())
-arcpy.SelectLayerByAttribute_management(ROW_to_TL_sj_1toM, "NEW_SELECTION", "LOCALID is not Null and Join_Count_1to1 = 1")
+log_obj.info("Create Block Objects - assign ROW ID values to taxlots per spatial match (address not considered)".format())
+spatial_only_FL = arcpy.MakeFeatureLayer_management(ROW_to_TL_sj_1toM, r"in_memory\spatial_FL", "LOCALID is not Null and Join_Count_1to1 = 1")
+spatial_only = arcpy.CopyFeatures_management(spatial_only_FL, r"in_memory\spatial_only")
 
-#input_dict = utility.get_field_value_as_dict(ROW_to_TL_sj_1toM, "PROPERTYID", "LOCALID")
-#utility.assign_field_value_from_dict_and_set_process_source(input_dict, config.taxlots,"PROPERTYID", "LOCALID", "spatial only")
-utility.get_and_assign_field_value_and_set_process_source(ROW_to_TL_sj_1toM,
+print(arcpy.GetCount_management(spatial_only))
+
+utility.get_and_assign_field_value_and_set_process_source(spatial_only,
                                                           "PROPERTYID",
                                                           "LOCALID",
                                                           config.taxlots,
@@ -82,14 +93,14 @@ utility.get_and_assign_field_value_and_set_process_source(ROW_to_TL_sj_1toM,
                                                           "LOCALID",
                                                           "spatial only")
 
-arcpy.SelectLayerByAttribute_management(ROW_to_TL_sj_1toM, "CLEAR_SELECTION")
 
 log_obj.info("Create Block Objects - assign ROW ID values to taxlots per spatial match + address match".format())
-arcpy.SelectLayerByAttribute_management(ROW_to_TL_sj_1toM, "NEW_SELECTION", "LOCALID is not Null and Join_Count_1to1 > 1 and ADDR_match = 1")
+spatial_plus_address_FL = arcpy.MakeFeatureLayer_management(ROW_to_TL_sj_1toM, r"in_memory\spatial_plus_address_FL", "LOCALID is not Null and Join_Count_1to1 > 1 and ADDR_match = 1")
+spatial_plus_address = arcpy.CopyFeatures_management(spatial_plus_address_FL, r"in_memory\spatial_plus_address")
 
-#input_dict = utility.get_field_value_as_dict(ROW_to_TL_sj_1toM, "PROPERTYID", "LOCALID")
-#utility.assign_field_value_from_dict_and_set_process_source(input_dict, config.taxlots,"PROPERTYID", "LOCALID", "spatial + address match")
-utility.get_and_assign_field_value_and_set_process_source(ROW_to_TL_sj_1toM,
+print(arcpy.GetCount_management(spatial_plus_address))
+
+utility.get_and_assign_field_value_and_set_process_source(spatial_plus_address,
                                                           "PROPERTYID",
                                                           "LOCALID",
                                                           config.taxlots,
@@ -97,23 +108,16 @@ utility.get_and_assign_field_value_and_set_process_source(ROW_to_TL_sj_1toM,
                                                           "LOCALID",
                                                           "spatial + address match")
 
-arcpy.SelectLayerByAttribute_management(ROW_to_TL_sj_1toM, "CLEAR_SELECTION")
 
 log_obj.info("Create Block Objects - assign ROW ID values to taxlots per majority allocation".format())
-# get the taxlots that were assigned either by spatial only or spatial + address match
-arcpy.SelectLayerByAttribute_management(ROW_to_TL_sj_1toM, "NEW_SELECTION", "LOCALID is not Null and Join_Count_1to1 > 1 and ADDR_match = 1 or LOCALID is not Null and Join_Count_1to1 = 1")
-selection_copy = arcpy.CopyFeatures_management(ROW_to_TL_sj_1toM, r"in_memory\selection_copy")
-arcpy.SelectLayerByAttribute_management(ROW_to_TL_sj_1toM, "CLEAR_SELECTION")
+unassigned_TL_FL = arcpy.MakeFeatureLayer_management(config.taxlots, r"in_memory\unassigned_TL_FL", "LOCALID is Null")
+unassigned_TL = arcpy.CopyFeatures_management(unassigned_TL_FL, r"in_memory\unassigned_FL")
 
-# get the taxlots that did not get assigned a LOCALID
-arcpy.SelectLayerByAttribute_management(ROW_to_TL_sj_1toM, "NEW_SELECTION", "ADDR_match = 0")
-arcpy.SelectLayerByLocation_management(ROW_to_TL_sj_1toM, "ARE_IDENTICAL_TO", selection_copy, "#", "REMOVE_FROM_SELECTION")
+print(arcpy.GetCount_management(unassigned_TL))
 
-remainder_to_points = arcpy.FeatureToPoint_management(ROW_to_TL_sj_1toM, r"in_memory\remainder_to_points", "CENTROID")
-point_allocation_sect = arcpy.Intersect_analysis([remainder_to_points, allocation_vector], r"in_memory\point_allocation_sect", "#", "#", "POINT")
+unassigned_to_points = arcpy.FeatureToPoint_management(unassigned_TL, r"in_memory\unassigned_to_points", "CENTROID")
+point_allocation_sect = arcpy.Intersect_analysis([unassigned_to_points, allocation_vector], r"in_memory\point_allocation_sect", "#", "#", "POINT")
 
-#input_dict = utility.get_field_value_as_dict(point_allocation_sect, "PROPERTYID", "gridcode")
-#utility.assign_field_value_from_dict_and_set_process_source(input_dict, config.taxlots, "PROPERTYID", "LOCALID", "majority allocation")
 utility.get_and_assign_field_value_and_set_process_source(point_allocation_sect,
                                                           "PROPERTYID",
                                                           "gridcode",
@@ -123,19 +127,36 @@ utility.get_and_assign_field_value_and_set_process_source(point_allocation_sect,
                                                           "majority allocation")
 
 
-#print("  ---   ROW to TL sj fields")
-#for field in utility.list_field_names(ROW_to_TL_sj_1toM):
-#    print(field)
+log_obj.info("Create Block Objects - merge taxlots and ROW".format())
+TL_ROW_merge = arcpy.Merge_management([config.taxlots, ARC_ROW_dissolve], r"in_memory\TL_ROW_merge")
 
-#print("  ----  taxlot fields")
-#for field in utility.list_field_names(config.taxlots):
-#    print(field)
+utility.add_field_if_needed(TL_ROW_merge, "block_object_ID", "LONG")
+with arcpy.da.UpdateCursor(TL_ROW_merge, ["LOCALID", "block_object_ID"]) as cursor:
+    for row in cursor:
+        if row[0] != None:
+            row[1] = row[0]
+        cursor.updateRow(row)
 
-# REMOVE AFTER QC
-#arcpy.CopyFeatures_management(config.taxlots, os.path.join(config.output_gdb, "TL_intermediate_1"))
-arcpy.CopyFeatures_management(ROW_to_TL_sj_1toM, os.path.join(config.output_gdb, "ROW_to_TL_sj_1toM_intermediate_1"))
+log_obj.info("Create Block Objects - dissolve result - create final block object result".format())
+TL_ROW_diss = arcpy.Dissolve_management(TL_ROW_merge, r"in_memory\TL_ROW_diss", "block_object_ID")
+
+log_obj.info("Create Block Objects - adding Color".format())
+utility.add_field_if_needed(TL_ROW_diss, "Color", "SHORT")
+with arcpy.da.UpdateCursor(TL_ROW_diss, ["Color"]) as cursor:
+    counter = 1
+    for row in cursor:
+        if counter < 11:
+            row[0] = counter
+            counter = counter + 1
+        else:
+            counter = 1
+            row[0] = counter
+            counter = counter + 1
+        cursor.updateRow(row)
 
 log_obj.info("Create Block Objects - writing to disk".format())
-arcpy.CopyFeatures_management(config.taxlots, os.path.join(config.output_gdb, "taxlots_intermediate_TEST"))
+arcpy.CopyFeatures_management(config.taxlots, os.path.join(config.output_gdb, "TEST_intermediate_taxlots"))
+arcpy.CopyFeatures_management(ROW_to_TL_sj_1toM, os.path.join(config.output_gdb, "TEST_ROW_to_TL_sj_1toM"))
+arcpy.CopyFeatures_management(TL_ROW_diss, os.path.join(config.output_gdb, "TEST_block_objects"))
 
 log_obj.info("Create Block Objects - done".format())
