@@ -6,7 +6,7 @@ from datetime import datetime
 print("Starting Config: " + datetime.now().strftime("%m/%d/%Y, %H:%M:%S"))
 
 log_file = r"\\besfile1\ism_projects\Work_Orders\Joes_Sandbox\dev\block_objects_log"
-output_gdb = r"\\besfile1\ASM_AssetMgmt\Projects\Interagency Risk Grid\BlockEval\Data\Arc\GDB\block_working_v2.gdb"
+output_gdb = r"\\besfile1\ASM_AssetMgmt\Projects\Interagency Risk Grid\BlockEval\Data\Arc\GDB\block_automation.gdb"
 
 CCF_to_gal_per_day = 748
 days_per_year = 365
@@ -70,5 +70,6 @@ with arcpy.da.UpdateCursor(census_blocks_2020, ["Pop_sqmi", "SQMI", "Pop"]) as c
 
 utility.add_field_if_needed(taxlots, "process_source", "TEXT", length=25)
 utility.add_field_if_needed(taxlots, "LOCALID", "LONG")
+
 
 print("Config Complete: " + datetime.now().strftime("%m/%d/%Y, %H:%M:%S"))

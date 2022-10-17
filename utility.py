@@ -37,10 +37,10 @@ def add_numeric_field(input_fc, field_name, field_type):
         arcpy.AddField_management(input_fc, field_name, field_type)
 
 
-def add_field_if_needed(input_fc, field_to_add, field_type, scale = None, length = None):
+def add_field_if_needed(input_fc, field_to_add, field_type, precision='', scale='', length=''):
     field_names = list_field_names(input_fc)
     if field_to_add not in field_names:
-        arcpy.AddField_management(input_fc, field_to_add, field_type, scale, length)
+        arcpy.AddField_management(input_fc, field_to_add, field_type, precision, scale, length)
 
 
 def delete_fields(existing_table, keep_fields_list):

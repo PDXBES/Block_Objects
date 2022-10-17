@@ -4,7 +4,7 @@ import utility
 import os
 
 log_obj = utility.Logger(config.log_file)
-log_obj.info("Create Block Objects - starting".format())
+log_obj.info("Create Block Objects - Starting".format())
 
 arcpy.env.overwriteOutput = True
 
@@ -13,7 +13,6 @@ arcpy.env.overwriteOutput = True
 log_obj.info("Create Block Objects - formatting ARC_ROW".format())
 key_field = "LOCALID"
 ARC_ROW_dissolve = arcpy.management.Dissolve(config.ARC_ROW, r"in_memory\ARC_ROW_diss", key_field)
-
 
 utility.add_field_if_needed(ARC_ROW_dissolve, "STREETNAME", "TEXT", length=50)
 utility.get_and_assign_field_value_from_dict(config.ARC_ROW,
@@ -66,7 +65,7 @@ ROW_to_TL_sj_1toM = arcpy.SpatialJoin_analysis(ROW_to_TL_sj_1to1,
 keep_fields = ["PROPERTYID", "SITEADDR", "Join_Count_1to1", "LOCALID", "STREETNAME"]
 utility.delete_fields(ROW_to_TL_sj_1toM, keep_fields)
 
-log_obj.info("Create Block Objects - add and populate ADDR_match".format())
+log_obj.info("Create Block Objects - adding and populating ADDR_match".format())
 utility.add_field_if_needed(ROW_to_TL_sj_1toM, "ADDR_match", "SHORT")
 with arcpy.da.UpdateCursor(ROW_to_TL_sj_1toM, ['SITEADDR', 'STREETNAME', 'ADDR_match']) as cursor:
     for row in cursor:
@@ -79,11 +78,11 @@ with arcpy.da.UpdateCursor(ROW_to_TL_sj_1toM, ['SITEADDR', 'STREETNAME', 'ADDR_m
            row[2] = 0
        cursor.updateRow(row)
 
-log_obj.info("Create Block Objects - assign ROW ID values to taxlots per spatial match (address not considered)".format())
+log_obj.info("Create Block Objects - assigning ROW ID values to taxlots per spatial match (address not considered)".format())
 spatial_only_FL = arcpy.MakeFeatureLayer_management(ROW_to_TL_sj_1toM, r"in_memory\spatial_FL", "LOCALID is not Null and Join_Count_1to1 = 1")
 spatial_only = arcpy.CopyFeatures_management(spatial_only_FL, r"in_memory\spatial_only")
 
-print(arcpy.GetCount_management(spatial_only))
+#print(arcpy.GetCount_management(spatial_only))
 
 utility.get_and_assign_field_value_and_set_process_source(spatial_only,
                                                           "PROPERTYID",
@@ -94,11 +93,11 @@ utility.get_and_assign_field_value_and_set_process_source(spatial_only,
                                                           "spatial only")
 
 
-log_obj.info("Create Block Objects - assign ROW ID values to taxlots per spatial match + address match".format())
+log_obj.info("Create Block Objects - assigning ROW ID values to taxlots per spatial match + address match".format())
 spatial_plus_address_FL = arcpy.MakeFeatureLayer_management(ROW_to_TL_sj_1toM, r"in_memory\spatial_plus_address_FL", "LOCALID is not Null and Join_Count_1to1 > 1 and ADDR_match = 1")
 spatial_plus_address = arcpy.CopyFeatures_management(spatial_plus_address_FL, r"in_memory\spatial_plus_address")
 
-print(arcpy.GetCount_management(spatial_plus_address))
+#print(arcpy.GetCount_management(spatial_plus_address))
 
 utility.get_and_assign_field_value_and_set_process_source(spatial_plus_address,
                                                           "PROPERTYID",
@@ -109,11 +108,11 @@ utility.get_and_assign_field_value_and_set_process_source(spatial_plus_address,
                                                           "spatial + address match")
 
 
-log_obj.info("Create Block Objects - assign ROW ID values to taxlots per majority allocation".format())
+log_obj.info("Create Block Objects - assigning ROW ID values to taxlots per majority allocation".format())
 unassigned_TL_FL = arcpy.MakeFeatureLayer_management(config.taxlots, r"in_memory\unassigned_TL_FL", "LOCALID is Null")
 unassigned_TL = arcpy.CopyFeatures_management(unassigned_TL_FL, r"in_memory\unassigned_FL")
 
-print(arcpy.GetCount_management(unassigned_TL))
+#print(arcpy.GetCount_management(unassigned_TL))
 
 unassigned_to_points = arcpy.FeatureToPoint_management(unassigned_TL, r"in_memory\unassigned_to_points", "CENTROID")
 point_allocation_sect = arcpy.Intersect_analysis([unassigned_to_points, allocation_vector], r"in_memory\point_allocation_sect", "#", "#", "POINT")
@@ -127,7 +126,7 @@ utility.get_and_assign_field_value_and_set_process_source(point_allocation_sect,
                                                           "majority allocation")
 
 
-log_obj.info("Create Block Objects - merge taxlots and ROW".format())
+log_obj.info("Create Block Objects - merging taxlots and ROW".format())
 TL_ROW_merge = arcpy.Merge_management([config.taxlots, ARC_ROW_dissolve], r"in_memory\TL_ROW_merge")
 
 utility.add_field_if_needed(TL_ROW_merge, "block_object_ID", "LONG")
@@ -137,7 +136,7 @@ with arcpy.da.UpdateCursor(TL_ROW_merge, ["LOCALID", "block_object_ID"]) as curs
             row[1] = row[0]
         cursor.updateRow(row)
 
-log_obj.info("Create Block Objects - dissolve result - create final block object result".format())
+log_obj.info("Create Block Objects - dissolving result - create final block object result".format())
 TL_ROW_diss = arcpy.Dissolve_management(TL_ROW_merge, r"in_memory\TL_ROW_diss", "block_object_ID")
 
 log_obj.info("Create Block Objects - adding Color".format())
@@ -145,7 +144,7 @@ utility.add_field_if_needed(TL_ROW_diss, "Color", "SHORT")
 with arcpy.da.UpdateCursor(TL_ROW_diss, ["Color"]) as cursor:
     counter = 1
     for row in cursor:
-        if counter < 11:
+        if counter <= 20:
             row[0] = counter
             counter = counter + 1
         else:
@@ -155,8 +154,10 @@ with arcpy.da.UpdateCursor(TL_ROW_diss, ["Color"]) as cursor:
         cursor.updateRow(row)
 
 log_obj.info("Create Block Objects - writing to disk".format())
-arcpy.CopyFeatures_management(config.taxlots, os.path.join(config.output_gdb, "TEST_intermediate_taxlots"))
-arcpy.CopyFeatures_management(ROW_to_TL_sj_1toM, os.path.join(config.output_gdb, "TEST_ROW_to_TL_sj_1toM"))
-arcpy.CopyFeatures_management(TL_ROW_diss, os.path.join(config.output_gdb, "TEST_block_objects"))
+#arcpy.CopyFeatures_management(TL_ROW_merge, os.path.join(config.output_gdb, "TL_ROW_merge"))
+#arcpy.CopyFeatures_management(point_allocation_sect, os.path.join(config.output_gdb, "point_allocation_sect"))
+arcpy.CopyFeatures_management(config.taxlots, os.path.join(config.output_gdb, "intermediate_taxlots"))
+arcpy.CopyFeatures_management(ROW_to_TL_sj_1toM, os.path.join(config.output_gdb, "ROW_to_TL_sj_1toM"))
+arcpy.CopyFeatures_management(TL_ROW_diss, os.path.join(config.output_gdb, "block_objects"))
 
-log_obj.info("Create Block Objects - done".format())
+log_obj.info("Create Block Objects - Done".format())
