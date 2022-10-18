@@ -26,15 +26,17 @@ ARC_ROW_raw = BESDBPROD1 + r"\SWSP.GIS.ARC_ROW"
 #print(arcpy.GetCount_management(ARC_ROW_raw))
 
 # create feature layers and subset by attributes if needed
-taxlots_sub = arcpy.MakeFeatureLayer_management(taxlots_raw, r"in_memory\taxlots_sub")
-street_centerline_sub = arcpy.MakeFeatureLayer_management(street_centerline_raw, r"in_memory\street_centerline_sub")
-ARC_ROW_sub = arcpy.MakeFeatureLayer_management(ARC_ROW_raw, r"in_memory\ARC_ROW_sub", "Id is not Null")
+taxlots_FL = arcpy.MakeFeatureLayer_management(taxlots_raw, r"in_memory\taxlots_FL")
+taxlots_sub = arcpy.MakeFeatureLayer_management(taxlots_raw, r"in_memory\taxlots_sub", "YEARBUILT is not Null AND YEARBUILT not in ( '0' , '' , '9999')")
+street_centerline_FL = arcpy.MakeFeatureLayer_management(street_centerline_raw, r"in_memory\street_centerline_FL")
+ARC_ROW_FL = arcpy.MakeFeatureLayer_management(ARC_ROW_raw, r"in_memory\ARC_ROW_FL", "Id is not Null")
 #print(arcpy.GetCount_management(ARC_ROW_sub))
 
 # subset by geographic area
+arcpy.SelectLayerByLocation_management(taxlots_FL, "HAVE_THEIR_CENTER_IN", city_boundary_raw)
+arcpy.SelectLayerByLocation_management(street_centerline_FL, "HAVE_THEIR_CENTER_IN", city_boundary_raw)
+arcpy.SelectLayerByLocation_management(ARC_ROW_FL, "HAVE_THEIR_CENTER_IN", city_boundary_raw)
 arcpy.SelectLayerByLocation_management(taxlots_sub, "HAVE_THEIR_CENTER_IN", city_boundary_raw)
-arcpy.SelectLayerByLocation_management(street_centerline_sub, "HAVE_THEIR_CENTER_IN", city_boundary_raw)
-arcpy.SelectLayerByLocation_management(ARC_ROW_sub, "HAVE_THEIR_CENTER_IN", city_boundary_raw)
 #print(arcpy.GetCount_management(ARC_ROW_sub))
 
 # this is based on a view which is based on copies of CU and the taxlots - should move/ point at live
@@ -49,9 +51,10 @@ RES_cayenta_taxlots_QL = arcpy.MakeQueryLayer_management(BESGEORPT_TEST,
 block_objects = arcpy.CopyFeatures_management(block_objects_raw, r"in_memory\block_objects")
 census_blocks_2020 = arcpy.CopyFeatures_management(census_blocks_2020_raw, r"in_memory\census_blocks_2020")
 RES_cayenta_taxlots = arcpy.CopyFeatures_management(RES_cayenta_taxlots_QL, r"in_memory\RES_cayenta_taxlots")
-taxlots = arcpy.CopyFeatures_management(taxlots_sub, r"in_memory\taxlots")
-street_centerlines = arcpy.CopyFeatures_management(street_centerline_sub, r"in_memory\street_centerlines")
-ARC_ROW = arcpy.CopyFeatures_management(ARC_ROW_sub, r"in_memory\ARC_ROW")
+taxlots = arcpy.CopyFeatures_management(taxlots_FL, r"in_memory\taxlots")
+taxlots_yearbuilt = arcpy.CopyFeatures_management(taxlots_sub, r"in_memory\taxlots_yearbuilt")
+street_centerlines = arcpy.CopyFeatures_management(street_centerline_FL, r"in_memory\street_centerlines")
+ARC_ROW = arcpy.CopyFeatures_management(ARC_ROW_FL, r"in_memory\ARC_ROW")
 #print(arcpy.GetCount_management(ARC_ROW))
 
 utility.add_field_if_needed(RES_cayenta_taxlots, "gal_per_day", "DOUBLE")
@@ -66,6 +69,13 @@ with arcpy.da.UpdateCursor(census_blocks_2020, ["Pop_sqmi", "SQMI", "Pop"]) as c
     for row in cursor:
         if row[0] is not None and row[1] is not None:
             row[2] = row[0] * row[1]
+            cursor.updateRow(row)
+
+utility.add_field_if_needed(taxlots_yearbuilt, "YEARBUILT_int", "SHORT")
+with arcpy.da.UpdateCursor(taxlots_yearbuilt, ["YEARBUILT", "YEARBUILT_int"]) as cursor:
+    for row in cursor:
+        if row[0] is not None:
+            row[1] = int(row[0])
             cursor.updateRow(row)
 
 utility.add_field_if_needed(taxlots, "process_source", "TEXT", length=25)
