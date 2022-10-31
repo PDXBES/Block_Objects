@@ -139,9 +139,14 @@ with arcpy.da.UpdateCursor(TL_ROW_merge, ["LOCALID", "block_object_ID"]) as curs
 log_obj.info("Create Block Objects - dissolving result - create final block object result".format())
 TL_ROW_diss = arcpy.Dissolve_management(TL_ROW_merge, r"in_memory\TL_ROW_diss", "block_object_ID")
 
+
+log_obj.info("Create Block Objects - cleanup - removing holes".format())
+TL_ROW_eliminate = arcpy.management.EliminatePolygonPart(TL_ROW_diss, r"in_memory\TL_ROW_eliminate", 'PERCENT', '#', 25, 'CONTAINED_ONLY')
+
+
 log_obj.info("Create Block Objects - adding Color".format())
-utility.add_field_if_needed(TL_ROW_diss, "Color", "SHORT")
-with arcpy.da.UpdateCursor(TL_ROW_diss, ["Color"]) as cursor:
+utility.add_field_if_needed(TL_ROW_eliminate, "Color", "SHORT")
+with arcpy.da.UpdateCursor(TL_ROW_eliminate, ["Color"]) as cursor:
     counter = 1
     for row in cursor:
         if counter <= 20:
@@ -158,6 +163,6 @@ log_obj.info("Create Block Objects - writing to disk".format())
 #arcpy.CopyFeatures_management(point_allocation_sect, os.path.join(config.output_gdb, "point_allocation_sect"))
 arcpy.CopyFeatures_management(config.taxlots, os.path.join(config.output_gdb, "intermediate_taxlots"))
 arcpy.CopyFeatures_management(ROW_to_TL_sj_1toM, os.path.join(config.output_gdb, "ROW_to_TL_sj_1toM"))
-arcpy.CopyFeatures_management(TL_ROW_diss, os.path.join(config.output_gdb, "block_objects"))
+arcpy.CopyFeatures_management(TL_ROW_eliminate, os.path.join(config.output_gdb, "block_objects"))
 
 log_obj.info("Create Block Objects - Done".format())

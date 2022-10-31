@@ -62,21 +62,21 @@ with arcpy.da.UpdateCursor(RES_cayenta_taxlots, ["gal_per_day", "WINTER_AVERAGE_
     for row in cursor:
         if row[1] is not None:
             row[0] = row[1]*(CCF_to_gal_per_day/days_per_year)
-            cursor.updateRow(row)
+        cursor.updateRow(row)
 
 utility.add_field_if_needed(census_blocks_2020, "Pop", "LONG")
 with arcpy.da.UpdateCursor(census_blocks_2020, ["Pop_sqmi", "SQMI", "Pop"]) as cursor:
     for row in cursor:
         if row[0] is not None and row[1] is not None:
             row[2] = row[0] * row[1]
-            cursor.updateRow(row)
+        cursor.updateRow(row)
 
 utility.add_field_if_needed(taxlots_yearbuilt, "YEARBUILT_int", "SHORT")
 with arcpy.da.UpdateCursor(taxlots_yearbuilt, ["YEARBUILT", "YEARBUILT_int"]) as cursor:
     for row in cursor:
         if row[0] is not None:
             row[1] = int(row[0])
-            cursor.updateRow(row)
+        cursor.updateRow(row)
 
 utility.add_field_if_needed(taxlots, "process_source", "TEXT", length=25)
 utility.add_field_if_needed(taxlots, "LOCALID", "LONG")
